@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+enum ChallengeStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String        @id @default(uuid())       
+  name                    String        
+  username                String?       @unique                       
+  email                   String        @unique                       
+  password                String?                            
+  profilePicture          String?                            
+  bio                     String?       @default("Passionate coder and problem solver. Always learning, always growing.")
+  challengesCreated       Challenge[]   @relation("CreatedChallenges")      
+  challengesParticipated  Challenge[]   @relation("ParticipatedChallenges") 
+  createdQuestions        Question[]    @relation("CreatedQuestions") // Add this line
+  submissions            Submission[]   // Add this line
+  createdAt               DateTime      @default(now())                     
+  updatedAt               DateTime      @updatedAt                          
+}
+
+model Challenge {
+  id                    String           @id @default(uuid())
+  title                 String
+  description           String?
+  creatorId             String
+  creator               User            @relation("CreatedChallenges", fields: [creatorId], references: [id])
+  participants          User[]          @relation("ParticipatedChallenges")
+  questions             Question[]      @relation("ChallengeQuestions")
+  startTime             DateTime?
+  duration              Int
+  submissions           Submission[]
+  joinCode              String           @unique @default(dbgenerated("substring((random() * 1000000)::int::text, 1, 6)"))
+  status                ChallengeStatus  @default(NOT_STARTED)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+}
+
+model Question {
+  id                  String      @id @default(uuid())
+  title               String
+  problemStatement    String
+  inputFormat         String?
+  outputFormat        String?
+  constraints         String?
+  creatorId           String
+  creator             User        @relation("CreatedQuestions", fields: [creatorId], references: [id])
+  testCases           TestCase[]
+  challenges          Challenge[] @relation("ChallengeQuestions")
+  submissions         Submission[] // Add this line for the opposite relation
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+}
+
+model TestCase {
+  id            Int         @id @default(autoincrement()) 
+  questionId    String      // Keep this as String
+  question      Question    @relation(fields: [questionId], references: [id])
+  input         String
+  expected      String
+  createdAt     DateTime    @default(now()) 
+  updatedAt     DateTime    @updatedAt 
+}
+
+model Submission {
+  id               String      @id @default(uuid())
+  userId           String
+  user             User        @relation(fields: [userId], references: [id])
+  challengeId      String         // Change this to Int to match Challenge.id type
+  challenge        Challenge   @relation(fields: [challengeId], references: [id])
+  questionId       String
+  question         Question    @relation(fields: [questionId], references: [id])
+  code             String
+  result           String      // Store results from test cases (e.g., "Passed", "Failed")
+  passedTestCases  Int         @default(0) // Count of passed test cases
+  createdAt        DateTime    @default(now())
+}
